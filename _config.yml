@@ -1,0 +1,9 @@
+title: Tairy
+url: "https://tairy.github.io"
+
+# Build settings
+markdown: kramdown
+theme: minima
+
+source: src
+destination: target
