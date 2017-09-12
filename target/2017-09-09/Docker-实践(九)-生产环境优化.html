@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>
+    
+      Docker 实践(九)：生产环境优化 &middot; Tairy's Blog
+    
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/">
+          <h2 class="nav-title">Tairy's Blog</h2>
+        </a>
+        <ul>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <div class="post-info">
+    <span>Written by&nbsp;</span>Tairy
+
+    
+      <br>
+      <span>on&nbsp;</span><time datetime="2017-09-09 00:00:00 +0800">September 09, 2017</time>
+    
+  </div>
+
+  <h1 class="post-title">Docker 实践(九)：生产环境优化</h1>
+  <div class="post-line"></div>
+
+  <blockquote>
+  <p>系列文章<a href="https://segmentfault.com/a/1190000007443677">第五篇</a>中介绍了线上生产环境使用 Docker 集群，这篇文章对原来的架构进行了优化，同时使用了 Docker 最新的一些特性，记录一些流水账。</p>
+</blockquote>
+
+<h3 id="centos">CentOS</h3>
+
+<p><code class="highlighter-rouge">CentOS</code> 和 <code class="highlighter-rouge">Docker</code> 确实不搭，但是苦于做不了主，只能硬着头皮上了，所幸没有遇上太大的坑。</p>
+
+<ol>
+  <li>必须要 <code class="highlighter-rouge">CentOS 7.0</code> 及以上才行，越新越好，内核也要升级到最新。</li>
+  <li>内核版本 <code class="highlighter-rouge">Linux 3.10.0-327.36.1.el7.x86_64</code> 有 bug，碰上了就别再折腾，赶紧绕过，<a href="https://github.com/moby/moby/issues/27214">Github Issue</a>。</li>
+  <li><a href="http://www.itzgeek.com/how-tos/linux/centos-how-tos/how-to-update-centos-7-07-17-2-to-centos-7-3.html">CentOS升级内核(需要梯子)</a>。</li>
+</ol>
+
+<h3 id="docker-compose">docker-compose</h3>
+
+<p>可喜的是新版本的 <code class="highlighter-rouge">docker-compose</code> 支持管理集群了，这比以前用 <code class="highlighter-rouge">docker service</code> 命令方便多了，只需要将 <code class="highlighter-rouge">docker-compose.yml</code> 的 <code class="highlighter-rouge">version</code> 修改为 3 或者更高，然后就可以愉快的使用新增的特性了，示例：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>version: '3'
+services:
+  nginx:
+    image: nginx:latest
+    networks:
+      - product
+    ports:
+      - 8022:80
+    environment:
+      TZ: 'Asia/Shanghai'
+    deploy:
+      mode: replicated
+      replicas: 4
+      placement:
+        constraints:
+          - node.role == worker
+      restart_policy:
+        condition: any
+  web-product:
+    image:web:latest
+    build:
+      context: ./
+    networks:
+      - product
+    environment:
+      TZ: 'Asia/Shanghai'
+    deploy:
+      mode: replicated
+      replicas: 4
+      placement:
+        placement:
+          - node.role == worker
+      restart_policy:
+        condition: any
+networks:
+  product:
+    driver: overlay
+</code></pre>
+</div>
+
+<ol>
+  <li>推荐在 <code class="highlighter-rouge">docker-compose.yml</code> 里面写上 <code class="highlighter-rouge">build</code> 节点，每次只需要执行 <code class="highlighter-rouge">docker-compose build --no-cache</code> 就可以构建镜像了，再也不需要记住复杂的镜像名和构建参数了。</li>
+  <li><code class="highlighter-rouge">deploy</code> 节点可以编排发布的一些特性，比如 <code class="highlighter-rouge">replicas</code> 可以指定运行的容器个数，也可以用<code class="highlighter-rouge">placement</code>来限定容器运行的节点。</li>
+  <li>编写好 <code class="highlighter-rouge">docker-compose.yml</code> 文件之后就可以执行下面命令将应用发布到集群中。</li>
+</ol>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>  docker stack deploy --compose-file docker-compose-product.yml web-product
+</code></pre>
+</div>
+<ol>
+  <li>建议 replicas 的数量 &gt; 1，否则上线的时候会出现短暂的 502。</li>
+</ol>
+
+<h3 id="ci">CI</h3>
+
+<p>对 ci 一直存在于理论中，这次有幸事件了一把，体验就是比 webhook 靠谱多了，配置也简单，强烈推荐，<code class="highlighter-rouge">.gitlab-ci.yml</code> 示例：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code># 可自定义上线的每个阶段
+stages:
+  - build
+  - release
+  - test
+  - release
+  - deploy
+  - cleanup
+
+build-beta-job:
+  stage: build
+  script:
+    - docker-compose -f docker-compose-beta.yml build --no-cache
+    - docker-compose -f docker-compose-beta.yml down -v
+    - docker-compose -f docker-compose-beta.yml up -d
+  only:
+    - master
+
+build-release-job:
+  stage: build
+  script:
+    - docker-compose -f docker-compose-release.yml build --no-cache
+    - docker-compose -f docker-compose-release.yml down
+    - docker-compose -f docker-compose-release.yml up -d
+  only:
+    - master
+
+deploy-product-job:
+  stage: deploy
+  script:
+    - docker build --no-cache -f Dockerfile-product -t 127.0.0.1:5000/web-product:latest .
+    - docker push 127.0.0.1:5000/web-product:latest
+    - docker stack deploy --compose-file docker-compose-product.yml web-product
+  only:
+    - release
+
+cleanup-job:
+  stage: cleanup
+  script:
+    - docker system prune -f
+  only:
+    - master
+    - release
+</code></pre>
+</div>
+
+<ol>
+  <li>找一台服务器安装 gitlab-runner，<a href="https://docs.gitlab.com/runner/install/">参考链接</a>，建议配置高一些。</li>
+  <li>在项目中编写 <code class="highlighter-rouge">.gitlab-ci.yml</code> 文件，然后推送到 <code class="highlighter-rouge">gitlab</code> 即可。</li>
+</ol>
+
+<h3 id="镜像结构">镜像结构</h3>
+
+<p>对于镜像的处理，依然沿用原来的办法，将环境依赖的扩展等构建好作为一个底层基础镜像，业务代码镜像基于这个基础镜像再构建，可以加快构建速度。</p>
+
+<h3 id="配置文件">配置文件</h3>
+
+<p>鉴于上次搭建时配置文件管理混乱，这次做了统一规划：</p>
+
+<ol>
+  <li>为每个环境创建不同的配置文件，可以以环境名后缀。</li>
+  <li>构建最顶层镜像时连同配置文件一起 build 进去，千万不要在底层镜像修改配置文件。</li>
+</ol>
+
+<h3 id="清除数据">清除数据</h3>
+
+<p>新版的 <code class="highlighter-rouge">docker</code> 终于支持对无用数据的清除了，主要有以下命令:</p>
+
+<ul>
+  <li>docker image prune：删除无用的镜像。</li>
+  <li>docker container prune：删除无用的容器。</li>
+  <li>docker volume prune：删除无用的卷。</li>
+  <li>docker network prune：删除无用的网络。</li>
+  <li>docker system prune：删除无用的镜像、容器、卷、网络。</li>
+</ul>
+
+<p>要强制删除可加上 <code class="highlighter-rouge">-f</code> 参数。</p>
+
+
+</div>
+
+<div class="pagination">
+  
+  
+    <a href="http://0.0.0.0:4000/2017-09-08/Docker-%E5%AE%9E%E8%B7%B5(%E5%85%AB)-%E6%9E%84%E5%BB%BA-Laravel-%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83" class="right arrow">&#8594;</a>
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+    </main>
+
+    <footer>
+      <span>
+        &copy; <time datetime="2017-09-13 00:05:16 +0800">2017</time> . Made with Jekyll using the <a href="https://github.com/chesterhow/tale/">Tale</a> theme.
+      </span>
+    </footer>
+  </body>
+</html>

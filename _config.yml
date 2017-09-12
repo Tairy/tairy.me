@@ -3,7 +3,7 @@ permalink: /:year-:month-:day/:title
 
 # Setup
 title: Tairy's Blog
-paginate: 5
+paginate: 10
 baseurl: ""
 url: "http://tairy.me"
 

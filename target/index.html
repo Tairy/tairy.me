@@ -33,19 +33,136 @@
     <main>
       <div class="catalogue">
   
+    <a href="http://0.0.0.0:4000/2017-09-09/Docker-%E5%AE%9E%E8%B7%B5(%E4%B9%9D)-%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83%E4%BC%98%E5%8C%96" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-09 00:00:00 +0800" class="catalogue-time">September 09, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(九)：生产环境优化</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+           系列文章第五篇中介绍了线上生产环境使用 Docker 集群，这篇文章对原来的架构进行了优化，同时使用了 Docker 最新的一些特性，记录一些流水账。  CentOS CentOS 和 Docker 确实不搭，但是苦于做不了主，只能硬着头皮上了，所幸没有遇上太大的坑。  必须要 CentOS 7.0 及以上才行，越新越好，内核也要升级到最新。 内核版本 Linux 3.10.0-327.36.1.el7.x86_64 有 bug，碰上了就别再折腾，赶紧绕过，Github Issue。...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-08/Docker-%E5%AE%9E%E8%B7%B5(%E5%85%AB)-%E6%9E%84%E5%BB%BA-Laravel-%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-08 00:00:00 +0800" class="catalogue-time">September 08, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(八)：构建 Laravel 开发环境</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+           有人在 SegmentFault 上邀请我回答问题：请问下有人使用Docker来安装Laravel本地开发环境吗，随手写了篇答案，记录下。  首先需要明确，一容器一进程，多容器协作完成。 所以，需要以下四个容器：  nginx  作用：响应 web 请求，处理静态文件。 镜像：无需自己构建，直接拉去官方镜像。   php-fpm  作用：处理 PHP 脚本。 镜像：由于项目中可能依赖不同的扩展，需要依赖官方镜像自行构建， 另外还需要 composer 支持。   mysql...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-07/Docker-%E5%AE%9E%E8%B7%B5(%E4%B8%83)-%E6%8F%90%E5%8D%87%E5%B9%B8%E7%A6%8F%E6%84%9F" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-07 00:00:00 +0800" class="catalogue-time">September 07, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(七)：提升幸福感</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+           对程序员来说，阻碍幸福感最大的因素应该是那个伟大的墙了。  本文对 docker 系统配置过程中，国内使用的一些加速的办法做一些记录和总结，希望能给有需要的人带来微小的帮助。 Docker for mac 下载 Docker for mac 安装包，需要焚香沐浴，三拜九叩，等待网速最快的时候，点击下载链接，如果再配上一个好点的梯子，可能运气好的话，能顺利下载到。 当然我一般会选择去找土豪同事用他的超级梯子下载好 U盘拷过来。 Docker Docs 使用 Docker 最佳教程应该是Docker 官方文档了，但是没梯子的状态下访问速度基本上很慢，所以只能自备梯子，自求多福了。 docker pull 如果你想使用...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-06/Docker-%E5%AE%9E%E8%B7%B5(%E5%85%AD)-%E5%AE%B9%E5%99%A8%E7%9B%91%E6%8E%A7" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-06 00:00:00 +0800" class="catalogue-time">September 06, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(六)：容器监控</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+          前言  这两天研究了一下容器监控的问题，配置的过程中网上基本上找不到成型的教程文章，所以这篇文章记录一下，希望能给有需要的人带来帮助。  监控方案 监控方案我选择了 Zabbix，要实现对每个容器信息的监控，需要 zabbix-docker-monitoring 插件。 配置服务端 Zabbix 是 C/S 架构，服务端最好能配置在一台独立的宿主机上。 服务端 docker-compose 文件： version: '2' services:...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-05/Docker-%E5%AE%9E%E8%B7%B5(%E4%BA%94)-%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83%E5%AE%B9%E5%99%A8%E5%8C%96" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-05 00:00:00 +0800" class="catalogue-time">September 05, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(五): 生产环境容器化</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+          前言 最近花了将近一个月的时间研究了 Docker 在生产环境中的使用，作为新手，期间走了无数的弯路，这里纪录一下，希望给别人带来微小的帮助。 前面几部分，介绍了在搭建集群之前需要做的一些工作，后面  一块结合实际应用，介绍如何架构 docker 集群。 修改存储目录 生产环境中，镜像多了之后很容易把硬盘写满造成服务器宕机，所以需要挂载一块较大的硬盘，修改 docker 的默认存储路径，下面提供两种方案。 方案一：软连接 service docker stop mv /var/lib/docker /mnt/sdc/docker ln -s /mnt/sdc/docker /var/lib/docker  ...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-04/Docker-%E5%AE%9E%E8%B7%B5(%E5%9B%9B)-Beta-%E7%8E%AF%E5%A2%83%E5%AE%B9%E5%99%A8%E5%8C%96" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-04 00:00:00 +0800" class="catalogue-time">September 04, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(四): Beta 环境容器化</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+          最近把公司的 beta 环境做了容器化，目前达到的效果是代码提交到 gitlab，触发 webhook 将代码部署到测试服务器，然后就可以根据前后端不同的分支组合的域名来访问，从而省去了每次前后端代码都合并到 master 分支才能测试的环节。 系统架构  域名路由 nginx-proxy 是一个 Docker 容器， 是实现本文解决方案的神器，只需简单的配置，便可实现为多个容器路由的功能。 1. 在服务器上安装并运行 <div...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-03/Docker-%E5%AE%9E%E8%B7%B5(%E4%B8%89)-Mac-%E4%B8%8B%E6%9E%84%E5%BB%BA-Rails-%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-03 00:00:00 +0800" class="catalogue-time">September 03, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(三): Mac 下构建 Rails 开发环境</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+           rails 开发，最让人头疼的就是环境问题。其本身的理念加上某伟大防御工程的帮助，使得每次环境的配置都的花费很长的时间来解决；同时，与人协作也有诸多不便。所以一直在尝试做一个可以随时复用的开发环境来。  1. 安装 Docker 关于 Mac 下 docker 有了最新的解决方案，就是 Docker for Mac，直接下载安装就可以了（目前尚在 beta 版本，但是对于开发环境使用足矣）。 2. 编写 Dockerfile 为了实现目的，我做了两个 docker image，一个 base...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-02/Docker-%E5%AE%9E%E8%B7%B5(%E4%BA%8C)-%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-02 00:00:00 +0800" class="catalogue-time">September 02, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(二)：使用教程</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+           docker 即容器  一些概念 Docker Registry Docker 远程镜像仓库  DockerHub DaoCloud / Aliyun  Docker Images Docker Images 是用来创建 docker 容器的只读模版，其中包含了容器启动所需要的所有配置信息和运行程序，一次构建之后可以多次复用。 从结构上来讲，Docker Image 是分层次的，如图所示：...
+        </p>
+
+      </div>
+    </a>
+  
+    <a href="http://0.0.0.0:4000/2017-09-01/Docker-%E5%AE%9E%E8%B7%B5(%E4%B8%80)-%E4%BA%86%E8%A7%A3%E6%9E%B6%E6%9E%84" class="catalogue-item">
+      <div>
+        <time datetime="2017-09-01 00:00:00 +0800" class="catalogue-time">September 01, 2017</time>
+        <h1 class="catalogue-title">Docker 实践(一): 了解架构</h1>
+        <div class="catalogue-line"></div>
+
+        <p>
+           架构是一个很大的概念，也绝非一两篇文章能写清楚的，这里记录自己认为重要的部分和相关的学习资料。  Docker 总架构图  C/S 架构 docker 系统使用了 C/S 的架构，docker client 通过 REST API 请求 docker daemon 来管理 docker 的镜像和容器等。  Server 端驻守在后台，称之为 docker...
+        </p>
+
+      </div>
+    </a>
+  
 </div>
 
 <div class="pagination">
   
   
 
-  <span></span>
+  <span>1</span>
 </div>
     </main>
 
     <footer>
       <span>
-        &copy; <time datetime="2017-09-12 20:30:08 +0800">2017</time> . Made with Jekyll using the <a href="https://github.com/chesterhow/tale/">Tale</a> theme.
+        &copy; <time datetime="2017-09-13 00:05:16 +0800">2017</time> . Made with Jekyll using the <a href="https://github.com/chesterhow/tale/">Tale</a> theme.
       </span>
     </footer>
   </body>

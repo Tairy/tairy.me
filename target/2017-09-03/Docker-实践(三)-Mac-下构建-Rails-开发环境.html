@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>
+    
+      Docker 实践(三): Mac 下构建 Rails 开发环境 &middot; Tairy's Blog
+    
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/">
+          <h2 class="nav-title">Tairy's Blog</h2>
+        </a>
+        <ul>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <div class="post-info">
+    <span>Written by&nbsp;</span>Tairy
+
+    
+      <br>
+      <span>on&nbsp;</span><time datetime="2017-09-03 00:00:00 +0800">September 03, 2017</time>
+    
+  </div>
+
+  <h1 class="post-title">Docker 实践(三): Mac 下构建 Rails 开发环境</h1>
+  <div class="post-line"></div>
+
+  <blockquote>
+  <p><code class="highlighter-rouge">rails</code> 开发，最让人头疼的就是环境问题。其本身的理念加上某伟大防御工程的帮助，使得每次环境的配置都的花费很长的时间来解决；同时，与人协作也有诸多不便。所以一直在尝试做一个可以随时复用的开发环境来。</p>
+</blockquote>
+
+<h3 id="1-安装-docker">1. 安装 Docker</h3>
+
+<p>关于 Mac 下 docker 有了最新的解决方案，就是 <a href="https://docs.docker.com/docker-for-mac/#/getting-started-with-docker-for-mac">Docker for Mac</a>，直接下载安装就可以了（目前尚在 beta 版本，但是对于开发环境使用足矣）。</p>
+
+<h3 id="2-编写-dockerfile">2. 编写 Dockerfile</h3>
+
+<p>为了实现目的，我做了两个 <code class="highlighter-rouge">docker image</code>，一个 <code class="highlighter-rouge">base image</code>，命名 <code class="highlighter-rouge">rails</code>，主要实现 <code class="highlighter-rouge">rails</code> 运行环境的基础配置，为的是以后方便复用，另一个是项目相关的 <code class="highlighter-rouge">image</code>，主要针对特定的项目做一些配置。</p>
+
+<p><strong>rails.Dockerfile(关键部分在注释中有说明)</strong></p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>FROM ubuntu:16.10 <span class="c"># 如果下载的很慢，这里可以改成 Daocloud 的镜像：daocloud.io/library/ubuntu:trusty-XXXXXXX</span>
+MAINTAINER Tairy &lt;tairyguo@gmail.com&gt; <span class="c"># 改成你自己的</span>
+
+<span class="c"># Run update</span>
+<span class="c"># 为了加快 update 的速度，修改 ubuntu 源为阿里云（目前尝试的最快的，也可以自行选择其他国内的镜像）</span>
+RUN sed -i <span class="s1">'s/archive.ubuntu.com/mirrors.aliyun.com/g'</span> /etc/apt/sources.list <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> apt-get update --fix-missing <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> apt-get -y upgrade
+
+<span class="c"># Install dependencies</span>
+RUN apt-get install -y git-core <span class="se">\</span>
+    curl zlib1g-dev build-essential <span class="se">\</span>
+    libssl-dev libreadline-dev
+RUN apt-get update --fix-missing   
+RUN apt-get install -y libyaml-dev <span class="se">\</span>
+    libsqlite3-dev sqlite3 libxml2-dev <span class="se">\</span>
+    libxslt1-dev libcurl4-openssl-dev <span class="se">\</span>
+    python-software-properties libffi-dev
+
+<span class="c"># Install rbenv</span>
+<span class="c"># 这里 clone 的时候可能会有点慢，可以先 clone 到本地，把下面的 clone 操作改成 ADD rbenv /root/.rbenv 操作即可。</span>
+RUN git clone git://github.com/sstephenson/rbenv.git /root/.rbenv <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s1">'export PATH="$HOME/.rbenv/bin:$PATH"'</span> &gt;&gt; /root/.bashrc <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s1">'eval "$(rbenv init -)"'</span> &gt;&gt; /root/.bashrc <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> git clone git://github.com/sstephenson/ruby-build.git /root/.rbenv/plugins/ruby-build <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s1">'export PATH="$HOME/.rbenv/plugins/ruby-build/bin:$PATH"'</span> &gt;&gt; /root/.bashrc
+
+<span class="c"># 为了加速 rbenv 使用 ruby china 的加速插件</span>
+RUN git clone https://github.com/andorchen/rbenv-china-mirror.git /root/.rbenv/plugins/rbenv-china-mirror
+
+<span class="c"># Install ruby</span>
+RUN /root/.rbenv/bin/rbenv install -v 2.3.1 <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> /root/.rbenv/bin/rbenv global 2.3.1 <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s2">"gem: --no-document"</span> &gt; /root/.gemrc <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> /root/.rbenv/shims/gem sources --add https://ruby.taobao.org/ --remove https://rubygems.org/ <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> /root/.rbenv/shims/gem install bundler <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> /root/.rbenv/shims/gem install rails <span class="se">\</span>
+    <span class="o">&amp;&amp;</span> /root/.rbenv/bin/rbenv rehash
+RUN apt-get install -y software-properties-common python-software-properties
+<span class="c"># Install nodejs</span>
+RUN apt-get -y install nodejs
+
+RUN /root/.rbenv/shims/bundle config --global frozen 1
+RUN /root/.rbenv/shims/bundle config --global silence_root_warning 1
+
+<span class="c"># Run project</span>
+RUN mkdir -p /working
+WORKDIR /working
+ONBUILD COPY Gemfile /working
+ONBUILD COPY Gemfile.lock /working
+ONBUILD RUN /root/.rbenv/shims/bundle install --no-deployment
+ONBUILD COPY . /working
+
+<span class="c"># Some tools</span>
+RUN apt-get install -y vim inetutils-ping
+</code></pre>
+</div>
+
+<p>build</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="nb">cd</span> /path/to/Dockerfile
+docker build rails .
+</code></pre>
+</div>
+
+<p>以上，这个image 将会安装 rails 应用运行的基础环境，并且设置了 onbuild 执行的命令，之后自己的 <code class="highlighter-rouge">rails</code> 便可依赖该项目创建，例如：</p>
+
+<p><strong>demo.Dockerfile</strong></p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>FROM rails:latest <span class="c"># 这里添加依赖</span>
+MAINTAINER Tairy &lt;tairyguo@gmail.com&gt;
+
+<span class="c"># TODO: custom env</span>
+EXPOSE 3000
+</code></pre>
+</div>
+<p>将此 <code class="highlighter-rouge">Dockerfile</code> 置于 rails 的项目目录下，即可进行 build：</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="nb">cd</span> /path/to/rails/app/path
+docker build demo .
+</code></pre>
+</div>
+
+<h3 id="3-使用-docker-compose">3. 使用 docker-compose</h3>
+<p>使用 <code class="highlighter-rouge">docker-compose</code> 可以更好的管理容器，可在项目目录下编写 <code class="highlighter-rouge">docker-compose.yml</code> 文件(使用时删除#开头的注释内容)：</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="c"># compose 版本号，选择 2 即可</span>
+version: <span class="s1">'2'</span>
+services:
+  <span class="c"># 数据库容器</span>
+  db:
+    image: mongodb
+    <span class="c"># 数据库端口映射</span>
+    ports:
+      - <span class="s2">"4568:27017"</span>
+  web:
+  	 <span class="c"># build 路径</span>
+    build: .
+    <span class="c"># 相当于 Dockerfile 中的 CMD</span>
+    <span class="nb">command</span>: /root/.rbenv/shims/bundle <span class="nb">exec </span>rails s -p 3000 -b 0.0.0.0
+    ports:
+      - <span class="s2">"3000:3000"</span>
+    <span class="c"># 共享目录</span>
+    volumes:
+      - .:/working
+    <span class="c"># 依赖容器</span>
+    depends_on:
+      - db
+</code></pre>
+</div>
+
+<p>进而，执行 <code class="highlighter-rouge">docker-compose up</code> 命令即可实现容器的构建，等 server 启动完成后，就可以通过 <code class="highlighter-rouge">localhost:3000</code> 来访问了。</p>
+
+<p>也可以加参数 <code class="highlighter-rouge">docker-compose up -d</code> 让其在后台运行。</p>
+
+<h3 id="4-rubymine--docker">4. RubyMine &amp; Docker</h3>
+
+<p>可以在 RubyMine 中安装 Docker Plugin 来直接构建容器。</p>
+
+<h4 id="1-安装-docker-plugin">1. 安装 docker plugin</h4>
+
+<p>在 <code class="highlighter-rouge">Preferences/Plugins</code> 中搜索安装。</p>
+
+<p><img src="http://ww2.sinaimg.cn/mw1024/9631b1bbjw1f68hplbjkwj20vx0lwjwn.jpg" alt="docker" /></p>
+
+<h4 id="2-配置-docker-plugin">2. 配置 docker plugin</h4>
+<p>打开 <code class="highlighter-rouge">Build, Execution, Deployment/Docker</code></p>
+
+<p><img src="http://ww4.sinaimg.cn/mw1024/9631b1bbjw1f68hhfs1vxj20vx0lwq66.jpg" alt="docker" /></p>
+
+<ul>
+  <li>Name: ServerName</li>
+  <li>API URL: <a href="">Docker API Url</a></li>
+  <li>Certificates folder: <a href="">HTTPS</a></li>
+  <li>Docker Compose executable: 使用 <code class="highlighter-rouge">which docker-compose</code> 查看。</li>
+</ul>
+
+<h4 id="3-配置构建方式">3. 配置构建方式</h4>
+
+<p>在工具栏中打开 <code class="highlighter-rouge">Run/Debug Configurations</code> 窗口：</p>
+
+<p><img src="http://ww4.sinaimg.cn/mw1024/9631b1bbjw1f68hw9teloj205a04fdg4.jpg" alt="Run/Debug Configurations" /></p>
+
+<p><img src="http://ww1.sinaimg.cn/mw1024/9631b1bbjw1f68huh34ozj20wv0nhjtu.jpg" alt="Run/Debug Configurations" /></p>
+
+<ul>
+  <li>Server: 选择第二步配置的 server</li>
+  <li>Deployment: 选择 docker-compose.yml</li>
+</ul>
+
+<p>至此，便可在 IDE 中直接构建项目容器。</p>
+
+
+
+</div>
+
+<div class="pagination">
+  
+    <a href="http://0.0.0.0:4000/2017-09-04/Docker-%E5%AE%9E%E8%B7%B5(%E5%9B%9B)-Beta-%E7%8E%AF%E5%A2%83%E5%AE%B9%E5%99%A8%E5%8C%96" class="left arrow">&#8592;</a>
+  
+  
+    <a href="http://0.0.0.0:4000/2017-09-02/Docker-%E5%AE%9E%E8%B7%B5(%E4%BA%8C)-%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B" class="right arrow">&#8594;</a>
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+    </main>
+
+    <footer>
+      <span>
+        &copy; <time datetime="2017-09-13 00:05:16 +0800">2017</time> . Made with Jekyll using the <a href="https://github.com/chesterhow/tale/">Tale</a> theme.
+      </span>
+    </footer>
+  </body>
+</html>

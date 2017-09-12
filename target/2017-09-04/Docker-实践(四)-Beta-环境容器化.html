@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>
+    
+      Docker 实践(四): Beta 环境容器化 &middot; Tairy's Blog
+    
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/">
+          <h2 class="nav-title">Tairy's Blog</h2>
+        </a>
+        <ul>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <div class="post-info">
+    <span>Written by&nbsp;</span>Tairy
+
+    
+      <br>
+      <span>on&nbsp;</span><time datetime="2017-09-04 00:00:00 +0800">September 04, 2017</time>
+    
+  </div>
+
+  <h1 class="post-title">Docker 实践(四): Beta 环境容器化</h1>
+  <div class="post-line"></div>
+
+  <p>最近把公司的 <code class="highlighter-rouge">beta</code> 环境做了容器化，目前达到的效果是代码提交到 <code class="highlighter-rouge">gitlab</code>，触发 <code class="highlighter-rouge">webhook</code> 将代码部署到测试服务器，然后就可以根据前后端不同的分支组合的域名来访问，从而省去了每次前后端代码都合并到 <code class="highlighter-rouge">master</code> 分支才能测试的环节。</p>
+
+<h3 id="系统架构">系统架构</h3>
+
+<p><img src="http://ac-HSNl7zbI.clouddn.com/RfaIdbcDtc7STRMy9Swcg0S8MhJljaBSKk4gV4FS.jpg" alt="" /></p>
+
+<h3 id="域名路由">域名路由</h3>
+
+<p><a href="https://github.com/jwilder/nginx-proxy">nginx-proxy</a> 是一个 Docker 容器， 是实现本文解决方案的神器，只需简单的配置，便可实现为多个容器路由的功能。</p>
+
+<h4 id="1-在服务器上安装并运行">1. 在服务器上安装并运行</h4>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>docker run -d -p 80:80 -v /var/run/docker.sock:/tmp/docker.sock:ro jwilder/nginx-proxy
+</code></pre>
+</div>
+
+<h4 id="2-泛域名解析">2. 泛域名解析</h4>
+
+<p>假设有域名 foo.bar, 使用泛域名解析将 *.foo.bar解析到当前服务器即可。</p>
+
+<h4 id="3-启动下游容器">3. 启动下游容器</h4>
+
+<p>假设有一个运行 web 服务的容器，只需要在启动的时候加上 <code class="highlighter-rouge">-e VIRTUAL_HOST=web.foo.bar</code>，就可以实现对该容器的访问了。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>docker run -e VIRTUAL_HOST=web.foo.bar  ...
+</code></pre>
+</div>
+
+<blockquote>
+  <p>注意：如果使用 docker-compose 管理多个容器的时候，docker-compose 会为这些容器创建一个网桥，这样会使得后来手动创建的容器没法被路由，所以这里不建议使用 docker-compose 来管理。</p>
+</blockquote>
+
+<h3 id="可视化管理">可视化管理</h3>
+
+<p><a href="https://github.com/kevana/ui-for-docker">ui-for-docker</a> 是一个基于 docker remote api 实现的 web 管理界面，虽然界面不怎么样，但是基本上常用的功能已经实现了，前端使用 angular 实现，可以根据自己的需求作修改。</p>
+
+<h4 id="修改方法">修改方法</h4>
+
+<ul>
+  <li>clone 代码</li>
+  <li>npm install &amp;&amp; bower install</li>
+  <li>grunt run (更多操作可参看 gruntFile.js 文件)</li>
+</ul>
+
+<h3 id="代码部署">代码部署</h3>
+
+<p>使用 Gitlab 提供的 webhook 功能完成自动部署代码，期间遇到一些问题：</p>
+
+<h4 id="文件写入权限">文件写入权限</h4>
+
+<p>通过 webhook 的请求执行用户是 www-data，如果要在 hook 脚本中进行文件的写入操作是总会遇到权限问题，最暴力的办法就是给目录全部 777 或者在 Dockerfile 中将 www-data 用户加入 sudo 组，并且无需输入密码。</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="nb">echo</span> <span class="s2">" data-www ALL=NOPASSWD: ALL"</span> &gt;&gt; /etc/sudoers
+</code></pre>
+</div>
+
+<p>当然，正式的环境中需要对权限做严格控制，做到最小权限原则。</p>
+
+<h4 id="hook-响应超时">hook 响应超时</h4>
+
+<p>Gitlab 触发 hook 请求之后会一直等待服务器返回 <code class="highlighter-rouge">HTTP 200</code> 的状态码，如果没收到，会重复触发 hook，如果 hook 脚本执行时间过长会导致 HTTP 请求超时，或者一次代码提交触发多次部署请求，所以最后我选择用异步的方式，hook 脚本只需要接受上线指令，写入队列，上线过程交给另外一个脚本来完成。</p>
+
+<p>为了减少环境配置的麻烦，可以使用文件队列，php 可参考 <a href="https://gist.github.com/cnnewjohn/b9d2db29dd79f6b9d1a6">Filefifo.php</a>。</p>
+
+<p>可将队列目录挂载到 webhook 容器上，即可实现容器内部写入，主机读取队列(可使用supervisor 来管理该进程)，完成代码部署的过程。</p>
+
+<h3 id="日志回显">日志回显</h3>
+
+<p>使用 supervisor 管理上线脚本进程，需要把日志回显到 web 界面，首先在 supervisor 的配置文件中配置好日志路径，然后创建一个 websocket 容器，将日志目录挂载到容器中，再tail 读取日志文件，实时显示在 web 界面。</p>
+
+<p>可参考 <a href="https://github.com/Tairy/dockerfiles/tree/master/websocket">websocket</a>。</p>
+
+<ul>
+  <li><a href="http://socket.io/">socket.io</a></li>
+  <li><a href="https://github.com/lucagrulla/node-tail">node-tail</a></li>
+</ul>
+
+<h3 id="下游容器">下游容器</h3>
+
+<p>下游容器将前后端环境做了分离，降低耦合度，在使用过程中会减少一些麻烦。分离时会遇到浏览器同源策略的问题，可将前后端容器做互联，然后后端容器反向代理到前端容器。</p>
+
+<ul>
+  <li>前端容器参考: <a href="https://github.com/Tairy/dockerfiles/tree/master/frontend">frontend</a></li>
+  <li>后端容器参考: <a href="https://github.com/Tairy/dockerfiles/tree/master/backend">backend</a></li>
+</ul>
+
+<p>在部署代码的时候可根据不同的分支将代码部署到不同的目录，然后创建容器的时候把不同的分支目录挂载到不同的容器中，即可实现开发分支的随意搭配。</p>
+
+<h3 id="精简镜像">精简镜像</h3>
+
+<p>对于一些服务，有时候只需要一个非常简单的 web 容器就可以，比如上面的前端容器，但是如果使用 ubuntu + nginx 的配置的时候会发现镜像要几百兆，很不划算，所以考虑精简镜像。</p>
+
+<p>受<a href="http://blog.xebia.com/create-the-smallest-possible-docker-container/">这篇文章</a>的启发，打算自己用 go 实现一个简单的 web 服务器，这样 build 好的镜像基本上只有十几兆，但是因没有做相关的测试，所以还不敢放在线上。</p>
+
+<p>最后选择了使用 alpine + nginx 的策略，build 之后的镜像之后几十兆，已经减少了很多冗余的东西，具体可参考<a href="https://github.com/Tairy/dockerfiles/tree/master/simple-nginx">simple-nginx</a>。</p>
+
+<h3 id="结语">结语</h3>
+
+<p>经过无数次踩坑和不停的折腾，终于可以勉强使用了，当然还存在一些瑕疵，之后会慢慢修复。</p>
+
+<p>感谢期间帮助过我的每一位同事。</p>
+
+
+</div>
+
+<div class="pagination">
+  
+    <a href="http://0.0.0.0:4000/2017-09-05/Docker-%E5%AE%9E%E8%B7%B5(%E4%BA%94)-%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83%E5%AE%B9%E5%99%A8%E5%8C%96" class="left arrow">&#8592;</a>
+  
+  
+    <a href="http://0.0.0.0:4000/2017-09-03/Docker-%E5%AE%9E%E8%B7%B5(%E4%B8%89)-Mac-%E4%B8%8B%E6%9E%84%E5%BB%BA-Rails-%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83" class="right arrow">&#8594;</a>
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+    </main>
+
+    <footer>
+      <span>
+        &copy; <time datetime="2017-09-13 00:05:16 +0800">2017</time> . Made with Jekyll using the <a href="https://github.com/chesterhow/tale/">Tale</a> theme.
+      </span>
+    </footer>
+  </body>
+</html>

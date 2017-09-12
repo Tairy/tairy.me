@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>
+    
+      Docker 实践(一): 了解架构 &middot; Tairy's Blog
+    
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/">
+          <h2 class="nav-title">Tairy's Blog</h2>
+        </a>
+        <ul>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <div class="post-info">
+    <span>Written by&nbsp;</span>Tairy
+
+    
+      <br>
+      <span>on&nbsp;</span><time datetime="2017-09-01 00:00:00 +0800">September 01, 2017</time>
+    
+  </div>
+
+  <h1 class="post-title">Docker 实践(一): 了解架构</h1>
+  <div class="post-line"></div>
+
+  <blockquote>
+  <p>架构是一个很大的概念，也绝非一两篇文章能写清楚的，这里记录自己认为重要的部分和相关的学习资料。</p>
+</blockquote>
+
+<p><em>Docker 总架构图</em></p>
+
+<p><img src="http://ww1.sinaimg.cn/mw1024/9631b1bbjw1f69pesvxe8j20kn0ojmyy.jpg" alt="" /></p>
+
+<h3 id="cs-架构">C/S 架构</h3>
+
+<p>docker 系统使用了 C/S 的架构，docker client 通过 REST API 请求 docker daemon 来管理 docker 的镜像和容器等。</p>
+
+<ul>
+  <li>Server 端驻守在后台，称之为 docker daemon</li>
+  <li>Client 端是一个 CLI 程序，可以在命令行中通过 <code class="highlighter-rouge">docker</code> 这个二进制文件进行交互</li>
+</ul>
+
+<h3 id="docker-client">Docker client</h3>
+
+<p>Docker client 是给用户和 Docker daemon 建立通信的客户端，安装了 docker 之后，二进制文件 <code class="highlighter-rouge">docker</code> 就是 Docker client，与 Docker daemon 交互，实现对 Docker image 和 container 的管理请求。</p>
+
+<p>Docker client 与 docker daemon 建立请求的方式有三种，分别是：</p>
+
+<ul>
+  <li>tcp://host:port</li>
+  <li>unix://path/to/socket</li>
+  <li>fd://socketfd</li>
+</ul>
+
+<h3 id="docker-daemon">Docker daemon</h3>
+
+<p>Docker daemon 是一个常驻后台的系统进程，所谓“运行 docker”，指的就是运行 Docker daemon，其作用主要有以下两点：</p>
+
+<ul>
+  <li>接受并处理 Docker Client 发送的请求</li>
+  <li>管理所有的 Docker containers 和 Docker images</li>
+</ul>
+
+<p>Docker daemon 的架构大致可以分为三部分：Docker Server、Engine 和 Job。</p>
+
+<p><em>Docker daemon 架构示意图</em></p>
+
+<p><img src="http://ww4.sinaimg.cn/mw1024/9631b1bbgw1f69ieh32waj20ik0f8751.jpg" alt="" /></p>
+
+<ul>
+  <li>Docker Server 专门服务于 Docker Client，其作用是接受并调度分发 Docker client 发送的请求。</li>
+  <li>Engine 是 Docker 中的运行引擎， 是其运行的核心模块。Engine 中存储着大量的容器信息，也管理着 Docker 大部分 Job 的执行。</li>
+  <li>Job 是 Docker 中最基本的工作执行单元，Docker daemon 可以完成的每一项工作都能呈现为一个 Job。</li>
+</ul>
+
+<p><code class="highlighter-rouge">Linux</code> 下，使用 <code class="highlighter-rouge">dockerd</code> 命令，便可以 daemon 模式操作 <code class="highlighter-rouge">docker</code>。</p>
+
+<h3 id="docker-remote-api">Docker Remote Api</h3>
+
+<p>docker daemon 会监听 <code class="highlighter-rouge">unix:///var/run/docker.sock</code> 的 socket，提供一个 RESTful 的 Remote API，可供客户端访问，例如：</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>curl --unix-socket /var/run/docker.sock http:/containers/json<span class="se">\?</span>all<span class="se">\=</span>1
+</code></pre>
+</div>
+
+<p>便可得到所有的容器列表，相当于在 terminal 中执行了 <code class="highlighter-rouge">docker ps -a</code> 命令。</p>
+
+<blockquote>
+  <p><strong>注：</strong>如果需要自己实现 <code class="highlighter-rouge">docker client</code> 的，可访问 <a href="https://docs.docker.com/engine/reference/api/docker_remote_api/">Docker Remote API</a> 参考相关文档。</p>
+</blockquote>
+
+<p>docker daemon 监听来自 remote api 的请求的方式有三种，unix、tcp 和 fd。</p>
+
+<p>默认情况下，监听的是 <code class="highlighter-rouge">unix:///var/run/docker.sock</code>，在 <code class="highlighter-rouge">linux</code> 下，想要改变其监听方式，可以使用 <code class="highlighter-rouge">dockerd</code> 命令：</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>dockerd -H 0.0.0.0:5555
+</code></pre>
+</div>
+
+<p>便可将 docker daemon 的监听方式变为 <code class="highlighter-rouge">tcp://host:port</code> 的方式，然后客户端可以</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>docker -H :5555 pull ubuntu
+</code></pre>
+</div>
+<p>来访问 <code class="highlighter-rouge">daemon</code>。</p>
+
+
+</div>
+
+<div class="pagination">
+  
+    <a href="http://0.0.0.0:4000/2017-09-02/Docker-%E5%AE%9E%E8%B7%B5(%E4%BA%8C)-%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B" class="left arrow">&#8592;</a>
+  
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+    </main>
+
+    <footer>
+      <span>
+        &copy; <time datetime="2017-09-13 00:05:16 +0800">2017</time> . Made with Jekyll using the <a href="https://github.com/chesterhow/tale/">Tale</a> theme.
+      </span>
+    </footer>
+  </body>
+</html>

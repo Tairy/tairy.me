@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>
+    
+      Docker 实践(五): 生产环境容器化 &middot; Tairy's Blog
+    
+  </title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/">
+          <h2 class="nav-title">Tairy's Blog</h2>
+        </a>
+        <ul>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <div class="post-info">
+    <span>Written by&nbsp;</span>Tairy
+
+    
+      <br>
+      <span>on&nbsp;</span><time datetime="2017-09-05 00:00:00 +0800">September 05, 2017</time>
+    
+  </div>
+
+  <h1 class="post-title">Docker 实践(五): 生产环境容器化</h1>
+  <div class="post-line"></div>
+
+  <h3 id="前言">前言</h3>
+
+<p>最近花了将近一个月的时间研究了 Docker 在生产环境中的使用，作为新手，期间走了无数的弯路，这里纪录一下，希望给别人带来微小的帮助。</p>
+
+<p>前面几部分，介绍了在搭建集群之前需要做的一些工作，后面 <集群实践> 一块结合实际应用，介绍如何架构 docker 集群。</集群实践></p>
+
+<h3 id="修改存储目录">修改存储目录</h3>
+
+<p>生产环境中，镜像多了之后很容易把硬盘写满造成服务器宕机，所以需要挂载一块较大的硬盘，修改 docker 的默认存储路径，下面提供两种方案。</p>
+
+<p><strong>方案一：软连接</strong></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>service docker stop
+mv /var/lib/docker /mnt/sdc/docker
+ln -s /mnt/sdc/docker /var/lib/docker
+</code></pre>
+</div>
+
+<p><strong>方案二：修改配置</strong></p>
+
+<p>配置 deamon 启动时 <code class="highlighter-rouge">-g</code> 参数，可以直接改变存储路径。</p>
+
+<p>Ubuntu 系统需要先修改 <code class="highlighter-rouge">/lib/systemd/system/docker.service</code> 文件：</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>...
+<span class="o">[</span>Service]
+<span class="nv">ExecStart</span><span class="o">=</span>/usr/bin/docker -d <span class="nv">$DOCKER_OPTS</span>
+...
+<span class="nv">EnvironmentFile</span><span class="o">=</span>-/etc/default/docker
+...
+</code></pre>
+</div>
+
+<p>其中 <code class="highlighter-rouge">ExecStart</code> 就是 deamon 的启动命令，可以直接在后面加参数，也可以选择上述 <code class="highlighter-rouge">EnvironmentFile</code> 配置 ，然后将启动参数写到 <code class="highlighter-rouge">/etc/default/docker</code> 文件中：</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="nv">DOCKER_OPTS</span><span class="o">=</span><span class="s2">"-g /mnt/sdc/docker"</span>
+</code></pre>
+</div>
+
+<p>配置好之后，执行下面命令重新加载配置文件:</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>systemctl daemon-reload
+systemctl restart docker
+</code></pre>
+</div>
+
+<p>参考：<a href="https://forums.docker.com/t/how-do-i-change-the-docker-image-installation-directory/1169">How do I change the Docker image installation directory?</a></p>
+
+<h3 id="insecure-registry">Insecure Registry</h3>
+
+<p>生产环境中部署 docker，需要在搭建一个私有 registry：</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code>docker run -d -p 5000:5000 --restart<span class="o">=</span>always --name registry registry:2
+</code></pre>
+</div>
+<p>启动之后，没法直接进行镜像的 push/pull，因为默认要求配置 TLS。</p>
+
+<p>为了图方便，可以暂时把私有的 registry 加入为 <code class="highlighter-rouge">insecure-registry</code> 进行测试。</p>
+
+<p><code class="highlighter-rouge">insecure-registry</code> 也是通过添加 deamon 的启动参数实现的，可在 <code class="highlighter-rouge">/etc/default/docker</code> 中配置：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>DOCKER_OPTS="--insecure-registry 192.168.1.19:5000"
+</code></pre>
+</div>
+
+<p>然后重启即可。</p>
+
+<p>参考：<a href="https://docs.docker.com/registry/insecure/#/deploying-a-plain-http-registry">Deploying a plain HTTP registry</a></p>
+
+<h3 id="集群方案">集群方案</h3>
+
+<p>docker 集群部署目前有两种方案，一般称作 <code class="highlighter-rouge">一代 swarm</code> 和 <code class="highlighter-rouge">二代 swarm</code>。</p>
+
+<h4 id="一代-swarm">一代 swarm</h4>
+
+<p><a href="https://docs.docker.com/swarm/overview/">官方文档</a>。</p>
+
+<p>一代 swarm 是以容器的方式进行集群管理的，需要在每个节点上运行一个 swarm 容器，便可进行集群管理，简单部署测试可参考: <a href="https://segmentfault.com/a/1190000005074664">在ubuntu上使用swarm搭建docker集群</a>。</p>
+
+<p>需要注意的是，一代 swarm 还需要自己手动运行 k／v 服务容器，<a href="https://docs.docker.com/swarm/install-manual/#/step-4-set-up-a-discovery-backend">参考</a>，运行起来之后可能会遇到报错：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Error response from daemon: datastore for scope "global" is not initialized
+</code></pre>
+</div>
+<p>这其实是 deamon 没有配置 <code class="highlighter-rouge">cluster-advertise</code> 和 <code class="highlighter-rouge">cluster-store</code> 所致，需要在<code class="highlighter-rouge">/etc/default/docker</code> 中配置这两项，具体可参考 <a href="https://docs.docker.com/engine/reference/commandline/dockerd/#nodes-discovery">Nodes discovery</a>。</p>
+
+<h4 id="二代-swarm">二代 swarm</h4>
+
+<p><a href="https://docs.docker.com/engine/swarm/">官方文档</a>。</p>
+
+<p>二代 swarm 直接将 swarm 模式集成在 docker 里面，只需要简单的配置即可，参考：<a href="https://docs.docker.com/engine/swarm/swarm-tutorial/create-swarm/">Create a swarm</a>。</p>
+
+<h3 id="界面方案">界面方案</h3>
+
+<p>在之前的文章中，介绍过 ui-for-docker 作为管理的 web 界面，但是过于简陋，后来有找到一个基于 ui-for-docker 实现的 <a href="https://github.com/portainer/portainer">portainer</a>，支持 swarm mode，使用起来非常方便，也可以根据自己的需求修改。</p>
+
+<h3 id="集群实践">集群实践</h3>
+
+<p>实践过程中我分别尝试了一代 swarm 和二代 swarm。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>版本</th>
+      <th>配置过程</th>
+      <th>管理</th>
+      <th>扩容</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>一代</td>
+      <td>1. 配置 k/v store。2. 宿主机 docker deamon 监听某个端口。 3.在每台宿主机上运行 swarm 容器。</td>
+      <td>在任何一个节点都可以进行集群的管理</td>
+      <td>手动扩容</td>
+    </tr>
+    <tr>
+      <td>二代</td>
+      <td>1. manager init swarm mode 2. worker join</td>
+      <td>只能在 manager 节点进行管理</td>
+      <td>自动扩容</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>目前实现了把 Segmentfault 的 web 服务迁移到容器中，简单的说就是一个 nginx + php 的环境，以下是具体步骤：</p>
+
+<ol>
+  <li>使用二代 swarm。</li>
+  <li>创建一个 overlay 网络。</li>
+  <li>创建 nginx 服务。</li>
+  <li>创建 php 及 web 代码服务。</li>
+</ol>
+
+<p>需要明确的几点：</p>
+
+<ol>
+  <li>二代 swarm 在同一个网络下服务可以通过服务名发现其他服务。</li>
+  <li>二代 swarm 部署之后，将会监听每个节点上 publish 的端口，收到的请求会负载均衡到所有的 tasks 中。</li>
+</ol>
+
+<h4 id="nginx">nginx</h4>
+
+<p>nginx 服务只需选择官方提供的镜像，建议使用最轻量的 <code class="highlighter-rouge">nginx:alpine</code> 版本，自定义配置文件覆盖原生的即可。</p>
+
+<h4 id="php">php</h4>
+
+<p>镜像直接基于官方发布的php版本版本创建。</p>
+
+<p><strong>注意：</strong> ubuntu 宿主机尽量使用 <code class="highlighter-rouge">Debian</code> 版本的基础镜像，其他的可能会遇到各种坑。</p>
+
+<p>我在开始为了追求镜像尽量小，使用了基于 <code class="highlighter-rouge">alpine</code> 的基础镜像，遇到了以下问题：</p>
+
+<ol>
+  <li><code class="highlighter-rouge">7.1.0RC5-fpm-alpine</code> 版本，使用 session_set_save_handler 修改 session 的 save header 为 memached 之后没法写入 session，换成了 <code class="highlighter-rouge">7.0.12-alpine</code> 就好了。</li>
+  <li>web 代码对 mount 到容器中的 <code class="highlighter-rouge">www-data</code> 用户所属的目录没有写入权限，是因为 <code class="highlighter-rouge">alpine</code> 系统中默认 <code class="highlighter-rouge">www-data</code> 的 <code class="highlighter-rouge">uid</code> 是 82， 而宿主机 <code class="highlighter-rouge">Ubuntu/Debian</code> 的是 33，在 <code class="highlighter-rouge">alpine</code> 中 <code class="highlighter-rouge">uid</code> 是 33 的用户是 <code class="highlighter-rouge">xfs</code>，所以 mount 之后容器内部看到的文件所属用户是 <code class="highlighter-rouge">xfs</code>，而 php-fpm 的执行用户是 <code class="highlighter-rouge">www-data</code>， 所以才无法写入。  <br />
+解决办法就是弃用 <code class="highlighter-rouge">alpine</code>，使用基于 <code class="highlighter-rouge">Debian</code> 的基础镜像，这样带来的代价就是镜像大小翻了 10 倍。</li>
+</ol>
+
+<h4 id="更改时区">更改时区</h4>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>RUN apk update &amp;&amp; apk add ca-certificates &amp;&amp; \
+    apk add tzdata &amp;&amp; \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime &amp;&amp; \
+    echo "Asia/Shanghai" &gt; /etc/timezone
+</code></pre>
+</div>
+
+<p>还有 php.ini 的时区配置。</p>
+
+<h4 id="dns-服务">DNS 服务</h4>
+
+<p>docker 容器的 <code class="highlighter-rouge">/etc/hosts</code> 文件默认是不允许修改的，所以要自定义域名的解析就需要配置自己的内网 DNS 服务，推荐使用 <code class="highlighter-rouge">dnsmsq</code>, 然后将 deamon 的启动参数修改为 <code class="highlighter-rouge">--dns=192.168.x.x</code> 自己的 DNS 服务器，就可以实现自定义域名解析的需求。</p>
+
+<p>上述修改可解决服务器被墙导致谷歌、Facebook 等三方API无法使用的问题，也可以加速服务器访问外网。</p>
+
+<h4 id="代码更新">代码更新</h4>
+
+<p>作为 web 应用，代码需要时常上线更新，又需要在集群中部署，如果使用目录挂载的办法将带来额外的工作量，所以选择把代码直接打包到 php 容器中，每次上线重新构建镜像，具体步骤：</p>
+
+<ol>
+  <li>代码 push 到 gitlab，触发 CI 或者 webhook，构建镜像。</li>
+  <li>镜像 push 到私有的 registry 仓库中。</li>
+  <li>二代 swarm 提供 rolling update 的机制，执行相关命令即可。</li>
+</ol>
+
+<h3 id="一些经验">一些经验</h3>
+
+<ol>
+  <li>Docker 是进程容器，理论上一个容器只跑一个进程，杜绝当虚拟机使用。</li>
+  <li>要使用和宿主机一个体系的基础镜像。</li>
+  <li>国内使用建议搜索下 daocloud 镜像加速，会提升幸福感。</li>
+  <li>DNS 服务器会默认使用 <code class="highlighter-rouge">8.8.8.8</code>，所以正式环境一定要配置 DNS 服务器，否则一些三方登录的接口将会变得异常缓慢。</li>
+  <li>Docker 里面包含了很多新的思路，如果总是用老套路去思考，很可能就走入死胡同。</li>
+  <li>不要用百度搜索中文资料，一定要看最新的英文资料。</li>
+  <li>为了安全，确保 deamon 只监听 <code class="highlighter-rouge">/var/run/docker.sock</code>。</li>
+</ol>
+
+<h3 id="感谢">感谢</h3>
+
+<ul>
+  <li>感谢能容忍我无数次搞挂生产环境的老板。</li>
+  <li>感谢每次走入死胡同后一句话点醒我的同事。</li>
+  <li>感谢群里每一位帮助我的朋友。</li>
+  <li>感谢自己的坚持。</li>
+</ul>
+
+<h3 id="参考">参考</h3>
+
+<ul>
+  <li><a href="https://docs.docker.com/">官方文档</a>: 要想真的让 docker 为你工作，这份文档应当翻来覆去读无数遍。</li>
+  <li><a href="http://blog.lab99.org/post/docker-2016-07-14-faq.html">蜗牛问答录</a>: 蜗牛大神的问答录，新手入门需要反复拜读。</li>
+  <li>QQ 群: 325486037 蜗牛大神所建 docker 中文交流群，基本配置过程中遇到的问题都能得到解决。</li>
+</ul>
+
+
+</div>
+
+<div class="pagination">
+  
+    <a href="http://0.0.0.0:4000/2017-09-06/Docker-%E5%AE%9E%E8%B7%B5(%E5%85%AD)-%E5%AE%B9%E5%99%A8%E7%9B%91%E6%8E%A7" class="left arrow">&#8592;</a>
+  
+  
+    <a href="http://0.0.0.0:4000/2017-09-04/Docker-%E5%AE%9E%E8%B7%B5(%E5%9B%9B)-Beta-%E7%8E%AF%E5%A2%83%E5%AE%B9%E5%99%A8%E5%8C%96" class="right arrow">&#8594;</a>
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+    </main>
+
+    <footer>
+      <span>
+        &copy; <time datetime="2017-09-13 00:05:16 +0800">2017</time> . Made with Jekyll using the <a href="https://github.com/chesterhow/tale/">Tale</a> theme.
+      </span>
+    </footer>
+  </body>
+</html>
