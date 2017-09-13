@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "About"
+title: "关 于"
 author: "Tairy"
 permalink: /about/
 ---

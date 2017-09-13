@@ -15,7 +15,7 @@
   &-title {
     color: $default-shade;
     font-family: $sans-font;
-    font-size: 3rem;
+    font-size: 2rem;
     margin: 1rem 0;
     text-align: center;
   }
@@ -23,8 +23,8 @@
   &-line {
     border-top: .4rem solid $default-shade;
     display: block;
-    margin: 0 auto 3rem;
-    width: 4rem;
+    margin: 0 auto 2rem;
+    width: 2rem;
   }
 
   p {
@@ -33,6 +33,6 @@
   }
 
   a:hover {
-    text-decoration: underline;
+    text-decoration: none;
   }
 }

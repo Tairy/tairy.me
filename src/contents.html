@@ -7,7 +7,7 @@ permalink: /index/
 <ul class="index">
   {% for post in site.posts %}
     <li>
-      <a href="{{ post.url | prepend: site.prefix }}.html" class="index-item">
+      <a href="{{ post.url | prepend: site.url }}.html" class="index-item">
         <div>
           <h4 class="index-title">{{ post.title }}</h4>
         </div>
