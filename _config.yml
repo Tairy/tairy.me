@@ -6,6 +6,7 @@ title: Tairy's Blog
 paginate: 10
 baseurl: ""
 url: "http://tairy.me"
+prefix: "http://tairy.me"
 
 # Assets
 sass:
