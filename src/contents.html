@@ -1,0 +1,17 @@
+---
+layout: default
+title: Table of contents
+permalink: /index/
+---
+
+<ul class="index">
+  {% for post in site.posts %}
+    <li>
+      <a href="{{ post.url | prepend: site.prefix }}.html" class="index-item">
+        <div>
+          <h4 class="index-title">{{ post.title }}</h4>
+        </div>
+      </a>
+    </li>
+  {% endfor %}
+</ul>
