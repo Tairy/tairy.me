@@ -1,7 +1,8 @@
 ---
 layout: post
-title: "Docker 实践(四): Beta 环境容器化"
+title: "Docker 实践(四)：Beta 环境容器化"
 author: "Tairy"
+tag: "docker"
 ---
 
 最近把公司的 `beta` 环境做了容器化，目前达到的效果是代码提交到 `gitlab`，触发 `webhook` 将代码部署到测试服务器，然后就可以根据前后端不同的分支组合的域名来访问，从而省去了每次前后端代码都合并到 `master` 分支才能测试的环节。

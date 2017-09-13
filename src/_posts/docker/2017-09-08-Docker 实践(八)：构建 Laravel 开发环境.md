@@ -2,6 +2,7 @@
 layout: post
 title: "Docker 实践(八)：构建 Laravel 开发环境"
 author: "Tairy"
+tag: "docker"
 ---
 
 > 有人在 [SegmentFault](http:sf.gg) 上邀请我回答问题：[请问下有人使用Docker来安装Laravel本地开发环境吗](https://segmentfault.com/q/1010000007871262?_ea=1478295)，随手写了篇答案，记录下。

@@ -1,7 +1,8 @@
 ---
 layout: post
-title: "Docker 实践(三): Mac 下构建 Rails 开发环境"
+title: "Docker 实践(三)：Mac 下构建 Rails 开发环境"
 author: "Tairy"
+tag: "docker"
 ---
 
 > `rails` 开发，最让人头疼的就是环境问题。其本身的理念加上某伟大防御工程的帮助，使得每次环境的配置都的花费很长的时间来解决；同时，与人协作也有诸多不便。所以一直在尝试做一个可以随时复用的开发环境来。
